@@ -1,217 +1,132 @@
-# Viva Questions: Logistic Regression and Support Vector Machines
-### CS201L – Artificial Intelligence Laboratory | IIT Dharwad
+# Lab 7 Viva Questions: Logistic Regression and SVM
+### CS201L - Artificial Intelligence Laboratory
 
 ---
 
 ## Section 1: Logistic Regression
 
-**Q1. What is Logistic Regression, and why is it called "regression" if it is used for classification?**
+**Q1. What is Logistic Regression and why is it called "regression" if it's used for classification?**
+> Logistic Regression is a classification algorithm that models the probability of a class using the logistic (sigmoid) function. It's called regression because it fits a linear regression internally, but then applies a sigmoid to squash the output between 0 and 1, which is interpreted as a probability.
 
-Logistic Regression is a classification algorithm that models the probability of a sample belonging to a class using the sigmoid (logistic) function. It is called "regression" because internally it fits a linear regression model to the log-odds of the class probability. The final output is squashed to [0,1] using sigmoid, and a threshold (usually 0.5) is used to assign class labels.
+**Q2. What is the sigmoid function and what is its output range?**
+> The sigmoid function is σ(x) = 1 / (1 + e^(-x)). Its output always lies between 0 and 1, making it suitable for probability estimation.
 
----
+**Q3. Why did we use `solver='liblinear'` in this lab?**
+> `liblinear` is a library designed for large linear classification. It naturally supports One-vs-Rest (OvR) multiclass strategy, which trains a separate binary classifier for each class against all others. It is efficient for high-dimensional datasets like the HAR dataset with 561 features.
 
-**Q2. Write the sigmoid function and explain its role in Logistic Regression.**
+**Q4. What is the One-vs-Rest (OvR) strategy?**
+> In OvR, for a problem with K classes, K separate binary classifiers are trained. Each classifier learns to distinguish one class from all remaining classes. During prediction, the class whose classifier gives the highest confidence score is chosen.
 
-$$\sigma(z) = \frac{1}{1 + e^{-z}}$$
+**Q5. What is `max_iter` in Logistic Regression and why did we set it to 1000?**
+> `max_iter` is the maximum number of iterations for the solver to converge. The default (100) may not be enough for complex datasets. We set it to 1000 to give the solver enough iterations to find a good solution without a convergence warning.
 
-Where $z = w^T x + b$. The sigmoid maps any real-valued input to a value between 0 and 1, which can be interpreted as a probability.
-
----
-
-**Q3. What is the loss function used in Logistic Regression? Write it.**
-
-Binary Cross-Entropy (Log Loss):
-
-$$L = -\frac{1}{n} \sum_{i=1}^{n} \left[ y_i \log(\hat{y}_i) + (1 - y_i) \log(1 - \hat{y}_i) \right]$$
-
-For multiclass (like this lab), we use **Softmax + Categorical Cross-Entropy**.
+**Q6. What is the cost/loss function used in Logistic Regression?**
+> Logistic Regression uses Binary Cross-Entropy (Log Loss): L = -[y·log(ŷ) + (1-y)·log(1-ŷ)]. The goal is to minimize this loss over all training samples.
 
 ---
 
-**Q4. What does the weight vector `w` in Logistic Regression represent?**
+## Section 2: Support Vector Machines (SVM)
 
-Each weight $w_j$ represents the contribution (importance) of feature $j$ to the model's decision. A large absolute value of $w_j$ means feature $j$ strongly influences the output. This is why we can plot the absolute values of the weight vector to understand feature importance.
+**Q7. What is the core idea behind SVM?**
+> SVM finds the optimal hyperplane that maximally separates two classes. The "maximum margin" hyperplane is the one that is farthest from the nearest data points of each class. These nearest points are called Support Vectors.
 
----
+**Q8. What are Support Vectors?**
+> Support Vectors are the data points that lie closest to the decision boundary (hyperplane). They are the most critical points — removing any other point does not change the hyperplane, but removing a support vector does.
 
-**Q5. Why do we use `max_iter=1000` in `LogisticRegression()`?**
+**Q9. What is the margin in SVM and why do we want to maximize it?**
+> The margin is the distance between the decision boundary and the nearest support vectors from each class. Maximizing it leads to better generalization — a wider margin means the model is less likely to misclassify unseen data points that are close to the boundary.
 
-Logistic Regression is solved iteratively using gradient descent or solvers like LBFGS. The default `max_iter=100` may be insufficient for complex datasets with many features, causing the solver to not converge. Increasing it to 1000 gives the optimizer more iterations to find the optimal weights.
+**Q10. What is the role of the regularization parameter C in SVM?**
+> C controls the trade-off between maximizing the margin and minimizing classification errors on training data.
+> - **Large C**: Smaller margin, fewer training errors (risk of overfitting).
+> - **Small C**: Larger margin, more training errors allowed (risk of underfitting).
+> In this lab, we used the default C = 1.
 
----
+**Q11. What is the Kernel Trick? Why is it useful?**
+> The Kernel Trick allows SVM to operate in a high-dimensional feature space without explicitly computing the transformation. It replaces the dot product in the SVM formulation with a kernel function K(x, z), enabling the classifier to learn non-linear decision boundaries efficiently.
 
-**Q6. How does Logistic Regression handle multiclass classification (as in this dataset)?**
+**Q12. What are the three kernels we used in this lab?**
+> - **Linear**: K(x, z) = x·z — used when data is linearly separable.
+> - **Polynomial**: K(x, z) = (γ·x·z + r)^d — captures polynomial interactions between features.
+> - **RBF (Gaussian)**: K(x, z) = exp(-γ·||x-z||²) — maps data into infinite-dimensional space; good for complex boundaries.
 
-sklearn's `LogisticRegression` handles multiclass using:
-- **One-vs-Rest (OvR)**: Trains one binary classifier per class.
-- **Multinomial (Softmax)**: Models all classes jointly using the softmax function.
+**Q13. What does the `gamma` parameter control in RBF and Polynomial kernels?**
+> Gamma (γ) controls the influence of a single training example.
+> - **High γ**: Each point has a small radius of influence → complex, wiggly boundary → overfitting risk.
+> - **Low γ**: Each point has a large radius of influence → smoother boundary → underfitting risk.
+> We used `gamma='scale'` which automatically sets γ = 1 / (n_features × X.var()).
 
-By default, sklearn uses OvR for most solvers, or multinomial when `multi_class='multinomial'` and a suitable solver (like `lbfgs`) is specified.
+**Q14. Why did we use the validation set to choose the best polynomial degree?**
+> We cannot use the test set for model selection because that would lead to data leakage — the test set must remain unseen until final evaluation. The validation set acts as a proxy to tune hyperparameters (like degree), and then the test set gives an unbiased estimate of final performance.
 
----
-
-## Section 2: Support Vector Machines
-
-**Q7. What is the core idea behind a Support Vector Machine (SVM)?**
-
-SVM tries to find the **optimal hyperplane** that separates classes with the **maximum margin**. The margin is the distance between the hyperplane and the nearest data points from each class (called **support vectors**). Maximizing the margin generally leads to better generalization.
-
----
-
-**Q8. What are support vectors?**
-
-Support vectors are the data points that lie closest to the decision boundary (hyperplane). They are the most difficult to classify and directly influence the position and orientation of the hyperplane. If you remove non-support vector points, the hyperplane stays the same.
-
----
-
-**Q9. What is the role of the regularization parameter C in SVM?**
-
-C controls the trade-off between maximizing the margin and minimizing training errors:
-
-- **Small C** → Larger margin, more misclassifications allowed → can underfit
-- **Large C** → Smaller margin, fewer misclassifications → can overfit
-
-It is the most important hyperparameter to tune in SVM.
+**Q15. What happens as the polynomial degree increases?**
+> Higher degrees create more complex decision boundaries. Very high degrees can overfit the training data, performing well on training but poorly on unseen data. Lower degrees might underfit. The best degree is selected using validation accuracy.
 
 ---
 
-**Q10. Why can't we directly access the weight vector for RBF and Polynomial kernels?**
+## Section 3: Evaluation Metrics
 
-The Kernel Trick maps data to a high-dimensional (even infinite-dimensional for RBF) feature space implicitly — without ever computing the coordinates in that space. Since we never explicitly compute the feature map $\phi(x)$, we cannot retrieve the weight vector $w$ in the original space. Only for the **linear kernel** do we work in the original feature space, so `coef_` is accessible.
+**Q16. What is a Confusion Matrix?**
+> A confusion matrix is a table that shows the counts of True Positives (TP), True Negatives (TN), False Positives (FP), and False Negatives (FN) for each class. It gives a detailed view of where the model is making errors.
 
----
+**Q17. Define Accuracy, Precision, Recall, and F1-Score.**
+> - **Accuracy** = (TP + TN) / Total — overall correctness.
+> - **Precision** = TP / (TP + FP) — of all predicted positives, how many are actually positive.
+> - **Recall** = TP / (TP + FN) — of all actual positives, how many did we correctly identify.
+> - **F1-Score** = 2 × (Precision × Recall) / (Precision + Recall) — harmonic mean of precision and recall.
 
-**Q11. Explain the Kernel Trick in simple terms.**
+**Q18. When would you prefer Recall over Precision?**
+> When the cost of a False Negative is high. For example, in disease detection, missing a sick patient (FN) is more dangerous than a false alarm (FP), so we prioritize Recall.
 
-The Kernel Trick allows SVM to operate in a high-dimensional space without ever explicitly transforming the data. Instead of computing $\phi(x_i)^T \phi(x_j)$, we compute a kernel function $K(x_i, x_j)$ that gives the same result. This is computationally efficient and allows us to model non-linear decision boundaries.
+**Q19. Why did we use `average='weighted'` for precision, recall, and F1?**
+> Because this is a multiclass problem with class imbalance. `weighted` averaging computes the metric for each class and takes a weighted average based on the number of samples in each class. This gives more importance to classes with more samples.
 
----
-
-**Q12. What is the RBF (Radial Basis Function) kernel? Write its formula.**
-
-$$K(x_i, x_j) = \exp\left(-\gamma \|x_i - x_j\|^2\right)$$
-
-It measures similarity between two points based on distance. Points closer together get a higher kernel value (closer to 1). The parameter $\gamma$ controls how quickly the similarity drops with distance.
-
----
-
-**Q13. What does the `gamma` parameter control in RBF/Polynomial kernels?**
-
-- **Small gamma** → Each training point has a far reach → smoother, simpler boundary → risk of underfitting
-- **Large gamma** → Each training point has a short reach → complex, wiggly boundary → risk of overfitting
-
-`gamma='scale'` sets it to $1 / (\text{n\_features} \times \text{Var}(X))$, which is a good default.
+**Q20. What does a diagonal confusion matrix mean?**
+> A perfect diagonal means all predictions are correct — every sample was assigned its true label. Off-diagonal elements represent misclassifications.
 
 ---
 
-**Q14. What is the Polynomial kernel? Write its formula.**
+## Section 4: Dataset and Preprocessing
 
-$$K(x_i, x_j) = (\gamma \cdot x_i^T x_j + r)^d$$
+**Q21. What is the HAR dataset and what does it contain?**
+> The Human Activity Recognition dataset contains sensor data (accelerometer and gyroscope) from 30 people performing 6 activities: Walking, Walking Upstairs, Walking Downstairs, Sitting, Standing, and Laying. It has 10,299 samples and 561 features extracted from time and frequency domains.
 
-Where $d$ is the degree of the polynomial. It captures interactions between features. A higher degree allows more complex boundaries but increases risk of overfitting.
+**Q22. Why do we need feature scaling for SVMs?**
+> SVMs compute distances between data points using kernel functions. If features have very different scales (e.g., one feature ranges 0–1 and another 0–1000), the larger-scale feature will dominate the distance computation, biasing the model. Scaling ensures all features contribute equally.
 
----
+**Q23. Does Logistic Regression require feature scaling?**
+> Not strictly required, but it helps. Scaling leads to faster convergence of the solver and more stable gradient updates. Without scaling, the algorithm may take many more iterations.
 
-**Q15. How do you choose the best kernel for a given problem?**
+**Q24. What is PCA and why was it used?**
+> Principal Component Analysis (PCA) is a dimensionality reduction technique that transforms features into a new set of uncorrelated components (principal components) ordered by the variance they explain. We used it to reduce the 561 features while retaining most of the information, which can speed up training and reduce noise.
 
-- **Linear kernel**: Use when data is linearly separable or when you have many features (e.g., text classification).
-- **RBF kernel**: Good general-purpose choice for non-linear problems. Works well in most cases.
-- **Polynomial kernel**: Useful when the relationship between features involves polynomial interactions.
-
-In practice, try all kernels and use validation accuracy to pick the best one.
-
----
-
-## Section 3: Data Preprocessing & Metrics
-
-**Q16. Why is feature scaling important for Logistic Regression and SVM?**
-
-Both algorithms depend on distances or dot products between feature vectors. If one feature has values in the range [0, 10000] and another in [0, 1], the first will dominate the learning process. `StandardScaler` scales each feature to zero mean and unit variance, ensuring all features contribute equally.
+**Q25. What is the difference between "PCA All Components" and "PCA 99% Variance"?**
+> - **PCA All**: Keeps all principal components (same number as original features but rotated). No dimensionality reduction, just decorrelation.
+> - **PCA 99%**: Keeps only enough components to explain 99% of the variance, discarding the rest. This actually reduces the number of features, speeding up training with minimal accuracy loss.
 
 ---
 
-**Q17. Why should we fit the scaler only on training data and not on validation/test data?**
+## Section 5: Comparison and Analysis
 
-Fitting the scaler on val/test data would cause **data leakage** — the model would gain information about the test distribution during training. We must simulate a real-world scenario where test data is completely unseen. So we `fit_transform` on training data and only `transform` on val/test data using the same scaler.
+**Q26. Which classifier generally performs best on this type of dataset and why?**
+> SVM with RBF kernel typically performs best on the scaled HAR dataset because the data likely has a non-linear structure that the RBF kernel can capture. Linear SVM is also competitive since the 561-feature space is high-dimensional, where classes may already be nearly linearly separable.
 
----
+**Q27. Why might SVM Linear perform comparably to SVM RBF on high-dimensional data?**
+> In very high-dimensional spaces (like 561 features), data tends to be more linearly separable due to the "curse of dimensionality." The extra flexibility of the RBF kernel may not provide much benefit, and both kernels achieve similar performance.
 
-**Q18. What is a Confusion Matrix? What information does it give?**
+**Q28. What is the difference between training accuracy and test accuracy? Why does the gap matter?**
+> Training accuracy measures performance on data the model was trained on. Test accuracy measures performance on unseen data. A large gap (high train accuracy, low test accuracy) indicates overfitting — the model memorized training data instead of learning general patterns.
 
-A confusion matrix is a table that shows the number of:
-- **True Positives (TP)**: Correctly predicted as positive
-- **True Negatives (TN)**: Correctly predicted as negative
-- **False Positives (FP)**: Incorrectly predicted as positive (Type I error)
-- **False Negatives (FN)**: Incorrectly predicted as negative (Type II error)
+**Q29. Why is SVM with a polynomial kernel the slowest to train in this lab?**
+> Training multiple models (one per degree) and the inherently higher computational cost of the polynomial kernel (especially at higher degrees) makes it slower. Each SVM training is O(n²) to O(n³) in the number of samples.
 
-For multiclass, it is an $N \times N$ matrix where entry $(i, j)$ is the number of samples of class $i$ predicted as class $j$.
-
----
-
-**Q19. What is the difference between Macro and Micro averaging?**
-
-- **Macro averaging**: Compute the metric (e.g., precision) independently for each class and then take the unweighted average. Treats all classes equally regardless of their size.
-- **Micro averaging**: Aggregate the contributions (TP, FP, FN) of all classes first, then compute the metric. For multiclass classification, micro accuracy equals overall accuracy.
-
-Macro is better when you care equally about all classes (even rare ones). Micro is better when you care about overall performance.
+**Q30. If you were to improve the models further, what would you try?**
+> - Tune the regularization parameter C using cross-validation.
+> - Try different gamma values for RBF and polynomial kernels.
+> - Use GridSearchCV or RandomizedSearchCV for systematic hyperparameter tuning.
+> - Try ensemble methods like Random Forest or Gradient Boosting for comparison.
+> - Apply feature selection to remove irrelevant features.
 
 ---
 
-**Q20. Define Precision, Recall, and F1-score.**
-
-$$\text{Precision} = \frac{TP}{TP + FP}$$
-
-$$\text{Recall} = \frac{TP}{TP + FN}$$
-
-$$\text{F1-Score} = 2 \times \frac{\text{Precision} \times \text{Recall}}{\text{Precision} + \text{Recall}}$$
-
-- **Precision**: Out of all predicted positives, how many were actually positive?
-- **Recall**: Out of all actual positives, how many did we correctly predict?
-- **F1-Score**: Harmonic mean of Precision and Recall. Useful when you need a balance between the two.
-
----
-
-## Section 4: Conceptual & Comparative
-
-**Q21. What is the difference between Logistic Regression and SVM?**
-
-| Aspect | Logistic Regression | SVM |
-|--------|--------------------|----|
-| Objective | Maximize likelihood / minimize log-loss | Maximize margin between classes |
-| Output | Probability estimates | Class labels (no direct probability) |
-| Boundary | Linear only (without basis expansion) | Linear and Non-linear (via kernels) |
-| Sensitivity to outliers | Moderate | High (support vectors can shift) |
-| Scaling needed | Yes | Yes |
-
----
-
-**Q22. Can Logistic Regression handle non-linear data? How?**
-
-By default, Logistic Regression is a linear classifier. However, we can make it handle non-linear data by:
-1. Adding polynomial or interaction features manually before training.
-2. Applying kernel trick (Kernel Logistic Regression).
-
-SVM with non-linear kernels is typically a more natural choice for non-linear problems.
-
----
-
-**Q23. What happens when C is very large in SVM?**
-
-A very large C makes the SVM try to correctly classify every training point. This reduces the margin and can lead to a very complex decision boundary that fits the training data too closely — this is **overfitting**. The model may perform well on training data but poorly on unseen data.
-
----
-
-**Q24. How do you decide the optimal C using validation data?**
-
-Train the SVM with different values of C (e.g., [0.001, 0.01, 0.1, 1, 10, 100, 1000]) and evaluate each model on the validation set. Choose the C that gives the **highest validation accuracy**. Then, report the final performance on the test set using this optimal C.
-
----
-
-**Q25. Why do we use a separate validation set instead of testing directly?**
-
-The test set should represent unseen, real-world data. If we tune hyperparameters (like C or degree) using the test set, we are essentially "peeking" at the test data, which gives us an overly optimistic estimate of performance. The validation set is used for tuning, and the test set is used only for **final, unbiased evaluation**.
-
----
-
-*End of Viva Questions*
+*Good luck with your viva!*
