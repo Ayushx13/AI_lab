@@ -1,165 +1,105 @@
-# Lab 08 Viva Questions — Neural Networks
-**CS201L: Artificial Intelligence Laboratory | IIT Dharwad**
+# Lab 08 - Neural Networks: Potential Viva Questions
+### CS201L: Artificial Intelligence Laboratory | IIT Dharwad
 
 ---
 
-## 1. Fundamentals of Neural Networks
+## 1. Conceptual / Theory
 
-**Q1. What is a neural network and how is it inspired by the human brain?**
-A neural network is a computational model made up of layers of interconnected nodes (neurons). Each connection has a weight, and each neuron applies an activation function to its input. It is inspired by biological neurons that fire electrical signals when stimulated beyond a threshold.
-
-**Q2. What is the role of the input layer, hidden layer, and output layer?**
-- **Input layer:** Receives raw feature values and passes them forward without transformation.
-- **Hidden layer:** Extracts intermediate representations by applying weights and activation functions.
-- **Output layer:** Produces the final prediction; in classification, each neuron corresponds to a class.
-
-**Q3. Why do we need activation functions? What happens if we don't use them?**
-Activation functions introduce non-linearity into the network. Without them, stacking multiple layers is equivalent to a single linear transformation, making deeper architectures pointless — the network cannot learn complex, non-linear decision boundaries.
-
-**Q4. What is the tanh activation function? What are its properties?**
-`tanh(x) = (e^x - e^(-x)) / (e^x + e^(-x))`
-- Output range: **(-1, 1)**
-- Zero-centred (unlike Sigmoid), which helps gradient flow.
-- Saturates at extreme values, which can cause vanishing gradients in deep networks.
-
-**Q5. Why is Softmax used in the output layer for multi-class classification?**
-Softmax converts raw logits into a probability distribution over all classes, ensuring all outputs sum to 1. This makes the output interpretable as class probabilities and aligns with Cross-Entropy loss.
+1. What is the role of an activation function in a neural network? Why can't we just use linear neurons throughout?
+2. Why is `tanh` used as the hidden layer activation function in this assignment? What are its properties?
+3. What is the vanishing gradient problem? How does `tanh` relate to it, and why is ReLU often preferred in deeper networks?
+4. Why do we use Cross Entropy loss for multiclass classification instead of Mean Squared Error (MSE)?
+5. What is Softmax, and why is it suitable for the output layer in a multiclass classification problem?
+6. Why does PyTorch's `CrossEntropyLoss` not require you to explicitly apply Softmax in the output layer?
+7. What is the difference between a single hidden layer and a two hidden layer neural network in terms of representational capacity?
+8. What does it mean for a neural network to "converge"? How is convergence detected in this assignment?
+9. What is the role of the learning rate in SGD? What happens if it is too high or too low?
+10. What is the difference between Stochastic Gradient Descent (SGD) and full-batch Gradient Descent? Which one is used here, and why?
 
 ---
 
-## 2. Training Process
+## 2. Dataset & Preprocessing
 
-**Q6. What is forward propagation?**
-Forward propagation is the process of passing the input through the network layer by layer — applying weights, biases, and activation functions — to produce a prediction (output).
-
-**Q7. What is back propagation? Why is it important?**
-Backpropagation computes the gradient of the loss with respect to each weight using the chain rule of calculus. These gradients indicate how much each weight contributed to the error, allowing the optimizer to update weights and reduce the loss.
-
-**Q8. What is the Cross-Entropy loss function? Why is it preferred for classification?**
-Cross-Entropy measures the difference between the predicted probability distribution and the true label distribution:
-`L = -Σ y_true * log(y_pred)`
-It penalises confident wrong predictions heavily and is well-suited for probabilistic outputs like Softmax.
-
-**Q9. What is Stochastic Gradient Descent (SGD)?**
-SGD updates model weights using the gradient computed on the entire training batch (in batch-SGD) or individual samples. It iteratively moves weights in the direction that reduces the loss, guided by the learning rate.
-
-**Q10. What is the learning rate and how does it affect training?**
-The learning rate controls the step size of weight updates.
-- Too **high** → overshoots minima, training diverges.
-- Too **low** → training is very slow, may get stuck in local minima.
-- A good range in this lab is `0.001 ≤ lr ≤ 0.01`.
-
-**Q11. What is meant by convergence in training? How is it detected in this lab?**
-Convergence is when the training loss stops decreasing meaningfully. In this lab it is detected by tracking how much the loss changes between epochs — if the change is below a `threshold` (1e-3) for `patience` consecutive epochs, training stops early.
-
-**Q12. What is the purpose of `optimizer.zero_grad()` in PyTorch?**
-PyTorch accumulates gradients by default. Calling `zero_grad()` before each training step clears old gradients so they don't add up across iterations, which would corrupt weight updates.
+11. What is the Human Activity Recognition (HAR) dataset? What are the six activity classes?
+12. Why was the `subject` column removed from the dataset before training?
+13. What is the purpose of standardizing (scaling) the dataset before feeding it to a neural network?
+14. What is PCA (Principal Component Analysis)? Why is it used here?
+15. What is the difference between the PCA-All dataset and the PCA-99% dataset? How many features does each have?
+16. Why does retaining 99% variance in PCA reduce the input from 561 to 156 features? What do the remaining components represent?
+17. How were the training, validation, and test sets split in this assignment (ratio)?
+18. Why do we use a validation set separate from the test set during training?
 
 ---
 
-## 3. Architecture Choices
+## 3. Architecture & Implementation
 
-**Q13. How does increasing the number of neurons in a hidden layer affect the model?**
-More neurons increase the model's capacity to learn complex patterns. However, too many neurons can lead to overfitting, where the model memorises the training data but generalises poorly.
-
-**Q14. What is the difference between a single hidden layer and a two hidden layer network?**
-A two hidden layer network can learn more hierarchical and abstract features. The first hidden layer may learn low-level patterns while the second learns higher-level combinations. However, it also has more parameters and is harder to train.
-
-**Q15. Why might Architecture (64, 16) perform differently from (34, 34)?**
-(64, 16) has more neurons in the first layer to capture broad feature combinations, then compresses to 16 for refinement — a funnel structure. (34, 34) maintains a uniform width. Depending on the data, one may generalise better than the other.
-
-**Q16. In PyTorch, why does `nn.CrossEntropyLoss` not require an explicit Softmax in the output layer?**
-`nn.CrossEntropyLoss` internally combines `LogSoftmax` and `NLLLoss`. Adding a Softmax before it would result in applying Softmax twice, which distorts the probabilities and degrades training.
+19. How do you define a neural network in PyTorch? What is the role of `nn.Module` and the `forward()` method?
+20. What does `nn.Sequential` do? How is it used in this assignment to stack layers?
+21. What is `LabelEncoder` used for? Why do we need to convert string class labels to integers?
+22. Why do we call `model.train()` before training and `model.eval()` before evaluation?
+23. What does `torch.no_grad()` do, and why is it used during evaluation?
+24. What does `optimizer.zero_grad()` do? What would happen if we skipped this step?
+25. What does `loss.backward()` compute? What is the mathematical operation happening under the hood?
+26. What does `optimizer.step()` do after `loss.backward()`?
+27. How does `torch.argmax(outputs, dim=1)` give us the predicted class label?
+28. How are the trained models saved and loaded in PyTorch? What does `torch.save(model.state_dict(), path)` store?
 
 ---
 
-## 4. Data Normalisation
+## 4. Training & Hyperparameters
 
-**Q17. What is Z-score normalisation and why is it applied?**
-Z-score normalisation rescales each feature to have zero mean and unit standard deviation:
-`z = (x - μ) / σ`
-It ensures all features are on the same scale, preventing features with large magnitudes from dominating learning and generally leading to faster, more stable convergence.
-
-**Q18. Why must the mean and standard deviation be computed only from the training data?**
-Using validation or test statistics would constitute **data leakage** — the model would have indirect knowledge of unseen data during training. The same training statistics are then applied to validation and test sets to simulate real-world conditions.
-
-**Q19. In PyTorch, how do you efficiently apply Z-score normalisation to an entire matrix?**
-Using broadcasting:
-```python
-mean = X_train.mean(dim=0)   # shape: (34,)
-std  = X_train.std(dim=0)    # shape: (34,)
-X_normalised = (X - mean) / std
-```
-PyTorch broadcasts the mean/std vectors across all rows automatically.
-
-**Q20. What could go wrong if a feature has zero standard deviation during normalisation?**
-Division by zero would occur, producing `NaN` values. This is handled by clamping `std` to a small minimum value (e.g., `std.clamp(min=1e-8)`).
+29. What is the `patience` parameter in early stopping? How was it set in this assignment?
+30. What is the `threshold` parameter used for in the convergence check? What value was used here?
+31. Why was a learning rate of `0.01` chosen? What range of values is generally considered good for SGD?
+32. What would happen if `max_epochs` is set too low? And too high?
+33. How does the training loss curve (epoch vs loss plot) help you understand the training process?
+34. What does it mean if the training loss curve is oscillating and not decreasing smoothly?
+35. If two architectures have similar training loss but very different validation accuracy, what might be happening?
 
 ---
 
 ## 5. Evaluation Metrics
 
-**Q21. What is a confusion matrix? What information does it provide?**
-A confusion matrix is a table where rows represent actual classes and columns represent predicted classes. The diagonal shows correct predictions; off-diagonal entries show misclassification patterns between specific class pairs.
-
-**Q22. What is the difference between micro and macro averages?**
-- **Macro average:** Computes the metric independently per class, then averages equally across classes. Treats all classes equally regardless of size.
-- **Micro average:** Aggregates all true positives, false positives, etc. across classes before computing the metric. Favours the performance on larger classes.
-
-**Q23. When would macro average be more informative than micro average?**
-When classes are imbalanced. Macro average highlights poor performance on minority classes that micro average might mask due to the dominance of larger classes.
-
-**Q24. What is the F1-score and when is it preferred over accuracy?**
-F1-score is the harmonic mean of precision and recall:
-`F1 = 2 * (Precision * Recall) / (Precision + Recall)`
-It is preferred when classes are imbalanced, since accuracy can be misleadingly high if the model simply predicts the majority class.
-
-**Q25. Can accuracy alone be a sufficient metric for this dataset? Why or why not?**
-Not necessarily. If the 7 fruit classes are unevenly distributed, a model predicting the dominant class always could achieve high accuracy while being useless. Precision, recall, and F1 per class provide a more complete picture.
+36. What is a confusion matrix? How do you read it for a multiclass problem?
+37. What is accuracy, and when can it be a misleading metric?
+38. What is the difference between Precision and Recall? Give an intuitive explanation.
+39. What is the F1-score, and when is it more useful than accuracy alone?
+40. What is the difference between micro-average and macro-average for precision, recall, and F1-score?
+41. When would you prefer macro-average over micro-average for an imbalanced dataset?
+42. Looking at the class distribution table in the assignment (LAYING: 18.88%, WALKING DOWNSTAIRS: 13.65%), is this dataset balanced? How might imbalance affect evaluation?
 
 ---
 
-## 6. PyTorch Specifics
+## 6. Comparison Across Datasets & Architectures
 
-**Q26. What does `model.train()` vs `model.eval()` do?**
-- `model.train()` enables layers like Dropout and BatchNorm to behave in training mode (weights can be updated).
-- `model.eval()` switches these layers to inference mode (Dropout is disabled, BatchNorm uses running statistics). This ensures reproducible predictions on validation/test data.
-
-**Q27. Why is `torch.no_grad()` used during evaluation?**
-It disables gradient computation, saving memory and computation time. During inference, gradients are not needed since weights are not being updated.
-
-**Q28. What does `torch.argmax(outputs, dim=1)` return?**
-It returns the index of the maximum value across the class dimension (dim=1) for each sample — i.e., the predicted class label for each input.
-
-**Q29. How are models saved and loaded in PyTorch?**
-- Save: `torch.save(model.state_dict(), 'model.pth')`
-- Load: `model.load_state_dict(torch.load('model.pth'))`
-`state_dict()` stores only the learnable parameters (weights and biases), not the architecture itself.
-
-**Q30. What is `nn.Sequential` in PyTorch?**
-`nn.Sequential` is a container that chains layers in order. When you call `forward(x)`, the input passes through each layer sequentially. It simplifies model definition when there are no branching or skip connections.
+43. Which dataset (Original / Scaled / PCA-All / PCA-99) gave the best test accuracy and why do you think that is?
+44. Did adding a second hidden layer consistently improve performance? Why or why not?
+45. Did increasing the number of neurons in the hidden layer always lead to better accuracy? What tradeoff does this introduce?
+46. Why might the PCA-99 dataset (156 features) perform comparably or better than the full 561-feature dataset?
+47. What are the advantages of using PCA before training a neural network?
+48. Compare the convergence speed across different datasets. Which converged fastest and why?
 
 ---
 
-## 7. Conceptual / Analytical Questions
+## 7. Practical / Code-Based
 
-**Q31. Why does normalised data generally produce better results with this dataset?**
-The Date Fruit dataset has features with very different scales (large integers, large floats, small floats). Without normalisation, features with large values dominate gradient updates, causing slow or unstable learning. Z-score puts all features on equal footing.
+49. If you got an error like `RuntimeError: mat1 and mat2 shapes cannot be multiplied`, what does it likely mean in the context of your neural network?
+50. What change would you make to the code if you wanted to use ReLU instead of tanh as the hidden layer activation?
+51. How would you modify the `SingleHiddenLayerNN` class to add dropout regularization?
+52. How would you add a learning rate scheduler to reduce the learning rate over time?
+53. The assignment uses full-batch training (all samples at once). How would you modify the code to use mini-batches with `DataLoader`?
+54. What would you change in the code to use the Adam optimizer instead of SGD?
+55. If you wanted to load a saved model and run predictions on new data, what steps would you follow?
 
-**Q32. What is overfitting and how can you detect it using validation data?**
-Overfitting is when the model performs well on training data but poorly on unseen data. It can be detected when training loss keeps decreasing but validation accuracy stops improving or starts dropping.
+---
 
-**Q33. What is the role of the validation set in this lab?**
-The validation set is used to compare architectures and select the best one — without ever touching the test set. This avoids selection bias, ensuring the test set gives an unbiased final performance estimate.
+## 8. Tricky / Insight Questions
 
-**Q34. Why should the test set only be evaluated once, at the very end?**
-Repeated evaluation on the test set and using its results to make decisions (like tuning hyperparameters) causes the model to indirectly overfit to the test set, making it an unreliable estimate of real-world performance.
-
-**Q35. If both architectures give similar validation accuracy, what other factors might guide your choice?**
-- Training time (fewer parameters = faster)
-- Convergence speed (fewer epochs needed)
-- Stability (consistent results across multiple runs)
-- Generalisation gap (difference between training and validation loss)
+56. The output layer has no explicit Softmax in the model definition. Does this mean the model outputs probabilities? Explain.
+57. If training accuracy is very high but test accuracy is low, what is the likely problem? How would you fix it?
+58. Why might a very deep or very wide network perform worse than a simpler one on this dataset?
+59. Is it possible for a model with lower training loss to have lower test accuracy than a model with higher training loss? Explain.
+60. If you were to improve this assignment further, what would you try — more layers, different activation functions, batch normalization, dropout, or a different optimizer? Justify your choice.
 
 ---
 
