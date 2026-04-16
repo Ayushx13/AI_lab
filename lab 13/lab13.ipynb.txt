@@ -1,0 +1,539 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# CS201L: Artificial Intelligence Laboratory\n",
+    "## Lab 13: Hierarchical and DBSCAN Clustering\n",
+    "### IIT Dharwad — Roll No: IS24BM003"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import numpy as np\n",
+    "import pandas as pd\n",
+    "import matplotlib.pyplot as plt\n",
+    "import matplotlib.cm as cm\n",
+    "import scipy.cluster.hierarchy as sch\n",
+    "from sklearn.cluster import AgglomerativeClustering, DBSCAN\n",
+    "from sklearn.metrics import normalized_mutual_info_score, silhouette_score\n",
+    "from sklearn.preprocessing import LabelEncoder\n",
+    "\n",
+    "# Suppress warnings for cleaner output\n",
+    "import warnings\n",
+    "warnings.filterwarnings('ignore')\n",
+    "\n",
+    "print('All libraries imported successfully.')"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "## Helper: Purity Score"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def purity_score(y_true, y_pred):\n",
+    "    \"\"\"\n",
+    "    Compute clustering purity score.\n",
+    "    For each cluster, find the majority true label; purity = sum of majority counts / total points.\n",
+    "    Noise points (label == -1) are included in a separate 'noise' cluster.\n",
+    "    \"\"\"\n",
+    "    from collections import Counter\n",
+    "    total = len(y_true)\n",
+    "    correct = 0\n",
+    "    unique_clusters = set(y_pred)\n",
+    "    for cluster in unique_clusters:\n",
+    "        mask = (y_pred == cluster)\n",
+    "        cluster_labels = y_true[mask]\n",
+    "        if len(cluster_labels) == 0:\n",
+    "            continue\n",
+    "        most_common_count = Counter(cluster_labels).most_common(1)[0][1]\n",
+    "        correct += most_common_count\n",
+    "    return correct / total"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "## 1. Data Loading and Exploration"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# (a) Load the dataset\n",
+    "tsne_df = pd.read_csv('tsne_2d_features_6_languages.csv')\n",
+    "print('Shape:', tsne_df.shape)\n",
+    "print(tsne_df.head())\n",
+    "print('\\nValue counts per language:')\n",
+    "print(tsne_df['language'].value_counts())"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# (b) Separate features and labels\n",
+    "X = tsne_df[['tsne_1', 'tsne_2']].values\n",
+    "y_true_str = tsne_df['language'].values\n",
+    "\n",
+    "le = LabelEncoder()\n",
+    "y_true = le.fit_transform(y_true_str)\n",
+    "languages = le.classes_\n",
+    "print('Languages:', languages)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# (c) Visualize dataset — scatter plot with distinct color per language\n",
+    "COLORS = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown']\n",
+    "\n",
+    "plt.figure(figsize=(9, 7))\n",
+    "for idx, lang in enumerate(languages):\n",
+    "    mask = (y_true_str == lang)\n",
+    "    plt.scatter(X[mask, 0], X[mask, 1], s=8, alpha=0.6,\n",
+    "                color=COLORS[idx], label=lang)\n",
+    "plt.title('Scatter plot of 2D t-SNE features of six language audio embeddings')\n",
+    "plt.xlabel('tsne_1')\n",
+    "plt.ylabel('tsne_2')\n",
+    "plt.legend(markerscale=2, fontsize=9)\n",
+    "plt.tight_layout()\n",
+    "plt.savefig('fig1_ground_truth.png', dpi=120)\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "## 2. Hierarchical (Agglomerative) Clustering"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def plot_clusters(X, labels, title, filename=None, noise=False):\n",
+    "    unique_labels = sorted(set(labels))\n",
+    "    cmap = cm.get_cmap('tab10', len(unique_labels))\n",
+    "    plt.figure(figsize=(8, 6))\n",
+    "    for i, lbl in enumerate(unique_labels):\n",
+    "        mask = (labels == lbl)\n",
+    "        if noise and lbl == -1:\n",
+    "            plt.scatter(X[mask, 0], X[mask, 1], s=6, c='black',\n",
+    "                        marker='.', alpha=0.4, label='Noise')\n",
+    "        else:\n",
+    "            plt.scatter(X[mask, 0], X[mask, 1], s=10, alpha=0.6,\n",
+    "                        color=cmap(i), label=f'Cluster {lbl}')\n",
+    "    plt.title(title)\n",
+    "    plt.xlabel('tsne_1')\n",
+    "    plt.ylabel('tsne_2')\n",
+    "    plt.legend(markerscale=2, fontsize=8, ncol=2)\n",
+    "    plt.tight_layout()\n",
+    "    if filename:\n",
+    "        plt.savefig(filename, dpi=110)\n",
+    "    plt.show()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### 2(b)–2(i): All four linkage methods"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "linkage_methods = ['ward', 'complete', 'average', 'single']\n",
+    "hier_results = {}\n",
+    "\n",
+    "for linkage in linkage_methods:\n",
+    "    print(f'\\n{'='*55}')\n",
+    "    print(f'Linkage: {linkage.upper()}')\n",
+    "    print('='*55)\n",
+    "\n",
+    "    # Fit\n",
+    "    model = AgglomerativeClustering(n_clusters=6, linkage=linkage)\n",
+    "    labels = model.fit_predict(X)\n",
+    "\n",
+    "    # Metrics\n",
+    "    purity = purity_score(y_true, labels)\n",
+    "    nmi    = normalized_mutual_info_score(y_true, labels)\n",
+    "    sil    = silhouette_score(X, labels)\n",
+    "\n",
+    "    hier_results[linkage] = {'Purity': purity, 'NMI': nmi, 'Silhouette': sil, 'labels': labels}\n",
+    "    print(f'  Purity Score : {purity:.4f}')\n",
+    "    print(f'  NMI          : {nmi:.4f}')\n",
+    "    print(f'  Silhouette   : {sil:.4f}')\n",
+    "\n",
+    "    # Visualize\n",
+    "    plot_clusters(X, labels,\n",
+    "                  title=f'Agglomerative Clustering — Linkage: {linkage}',\n",
+    "                  filename=f'fig_hier_{linkage}.png')"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### 2(j): Compare linkage methods, dendrogram, and threshold analysis"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Comparison table\n",
+    "print('\\n Linkage Method Comparison:')\n",
+    "print(f\"{'Linkage':<12} {'Purity':>10} {'NMI':>10} {'Silhouette':>12}\")\n",
+    "print('-' * 46)\n",
+    "for lm in linkage_methods:\n",
+    "    r = hier_results[lm]\n",
+    "    print(f\"{lm:<12} {r['Purity']:>10.4f} {r['NMI']:>10.4f} {r['Silhouette']:>12.4f}\")\n",
+    "\n",
+    "# Identify best linkage\n",
+    "best_linkage = max(linkage_methods,\n",
+    "                   key=lambda lm: (\n",
+    "                       hier_results[lm]['Purity'] +\n",
+    "                       hier_results[lm]['NMI'] +\n",
+    "                       hier_results[lm]['Silhouette']\n",
+    "                   ))\n",
+    "print(f'\\nBest linkage method (by sum of metrics): {best_linkage.upper()}')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Dendrogram with best linkage + threshold analysis\n",
+    "linked = sch.linkage(X, method=best_linkage)\n",
+    "\n",
+    "# Thresholds\n",
+    "thresh_1 = 50\n",
+    "thresh_2 = 100\n",
+    "max_dist = np.max(linked[:, 2])\n",
+    "thresh_3 = 0.60 * max_dist\n",
+    "print(f'Max linkage distance : {max_dist:.2f}')\n",
+    "print(f'60% threshold        : {thresh_3:.2f}')\n",
+    "\n",
+    "plt.figure(figsize=(14, 6))\n",
+    "sch.dendrogram(\n",
+    "    linked,\n",
+    "    truncate_mode='level',\n",
+    "    p=10,\n",
+    "    leaf_rotation=90,\n",
+    "    leaf_font_size=8,\n",
+    "    show_contracted=True\n",
+    ")\n",
+    "plt.axhline(y=thresh_1, color='green',  linestyle='--', linewidth=1.5, label=f'Threshold = {thresh_1}')\n",
+    "plt.axhline(y=thresh_2, color='blue',   linestyle='--', linewidth=1.5, label=f'Threshold = {thresh_2}')\n",
+    "plt.axhline(y=thresh_3, color='red',    linestyle='--', linewidth=1.5, label=f'60% of max = {thresh_3:.1f}')\n",
+    "plt.title(f'Dendrogram — Linkage: {best_linkage} (truncated)')\n",
+    "plt.xlabel('Sample index / cluster')\n",
+    "plt.ylabel('Distance')\n",
+    "plt.legend(fontsize=9)\n",
+    "plt.tight_layout()\n",
+    "plt.savefig('fig_dendrogram.png', dpi=110)\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Count clusters formed at each threshold\n",
+    "def count_clusters_at_threshold(linked, threshold):\n",
+    "    labels = sch.fcluster(linked, t=threshold, criterion='distance')\n",
+    "    return len(set(labels))\n",
+    "\n",
+    "for t, name in [(thresh_1, '50'), (thresh_2, '100'), (thresh_3, '60% of max')]:\n",
+    "    nc = count_clusters_at_threshold(linked, t)\n",
+    "    print(f'Threshold {name:>12}  →  {nc} cluster(s)')"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### 2(k): Comparison with K-means and K-Medoids (from Lab 12)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# NOTE: Fill in the actual metrics from your Lab 12 notebook below.\n",
+    "# Placeholder values are provided; replace with real results.\n",
+    "\n",
+    "comparison_data = {\n",
+    "    'Method':          ['K-Means (Lab 12)', 'K-Medoids (Lab 12)',\n",
+    "                        'Hier. Ward', 'Hier. Complete',\n",
+    "                        'Hier. Average', 'Hier. Single'],\n",
+    "    'Purity Score':    [None, None,\n",
+    "                        hier_results['ward']['Purity'],\n",
+    "                        hier_results['complete']['Purity'],\n",
+    "                        hier_results['average']['Purity'],\n",
+    "                        hier_results['single']['Purity']],\n",
+    "    'NMI':             [None, None,\n",
+    "                        hier_results['ward']['NMI'],\n",
+    "                        hier_results['complete']['NMI'],\n",
+    "                        hier_results['average']['NMI'],\n",
+    "                        hier_results['single']['NMI']],\n",
+    "    'Silhouette':      [None, None,\n",
+    "                        hier_results['ward']['Silhouette'],\n",
+    "                        hier_results['complete']['Silhouette'],\n",
+    "                        hier_results['average']['Silhouette'],\n",
+    "                        hier_results['single']['Silhouette']]\n",
+    "}\n",
+    "\n",
+    "comp_df = pd.DataFrame(comparison_data)\n",
+    "print(comp_df.to_string(index=False, float_format=lambda x: f'{x:.4f}' if x is not None else 'N/A'))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "## 3. DBSCAN Clustering"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# (b)–(g) Grid search over eps and min_samples\n",
+    "min_samples_values = [5, 10, 15, 20, 25]\n",
+    "eps_values         = [2, 3, 5, 6, 7, 8]\n",
+    "\n",
+    "dbscan_results = []\n",
+    "\n",
+    "for min_samples in min_samples_values:\n",
+    "    for eps in eps_values:\n",
+    "        model  = DBSCAN(eps=eps, min_samples=min_samples)\n",
+    "        labels = model.fit_predict(X)\n",
+    "\n",
+    "        n_clusters  = len(set(labels)) - (1 if -1 in labels else 0)\n",
+    "        n_noise     = np.sum(labels == -1)\n",
+    "\n",
+    "        row = {\n",
+    "            'eps': eps, 'min_samples': min_samples,\n",
+    "            'n_clusters': n_clusters, 'n_noise': n_noise,\n",
+    "            'Purity': None, 'NMI': None, 'Silhouette': None,\n",
+    "            'labels': labels\n",
+    "        }\n",
+    "\n",
+    "        if n_clusters > 1:\n",
+    "            row['Purity']     = purity_score(y_true, labels)\n",
+    "            row['NMI']        = normalized_mutual_info_score(y_true, labels)\n",
+    "            row['Silhouette'] = silhouette_score(X, labels)\n",
+    "\n",
+    "        dbscan_results.append(row)\n",
+    "\n",
+    "print(f\"{'eps':>5} {'min_s':>6} {'k':>4} {'noise':>7} {'Purity':>9} {'NMI':>9} {'Sil':>9}\")\n",
+    "print('-' * 55)\n",
+    "for r in dbscan_results:\n",
+    "    p  = f\"{r['Purity']:.4f}\"    if r['Purity']     is not None else '  N/A   '\n",
+    "    n  = f\"{r['NMI']:.4f}\"       if r['NMI']        is not None else '  N/A   '\n",
+    "    s  = f\"{r['Silhouette']:.4f}\" if r['Silhouette'] is not None else '  N/A   '\n",
+    "    print(f\"{r['eps']:>5} {r['min_samples']:>6} {r['n_clusters']:>4} {r['n_noise']:>7} {p:>9} {n:>9} {s:>9}\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# (h) Identify best parameter combination\n",
+    "valid = [r for r in dbscan_results if r['Purity'] is not None]\n",
+    "\n",
+    "best = max(valid, key=lambda r: r['Purity'] + r['NMI'] + r['Silhouette'])\n",
+    "print(f\"Best DBSCAN params: eps={best['eps']}, min_samples={best['min_samples']}\")\n",
+    "print(f\"  Clusters  : {best['n_clusters']}\")\n",
+    "print(f\"  Noise pts : {best['n_noise']}\")\n",
+    "print(f\"  Purity    : {best['Purity']:.4f}\")\n",
+    "print(f\"  NMI       : {best['NMI']:.4f}\")\n",
+    "print(f\"  Silhouette: {best['Silhouette']:.4f}\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# (g) Visualize best DBSCAN result\n",
+    "best_labels = best['labels']\n",
+    "unique_labels = sorted(set(best_labels))\n",
+    "cmap = cm.get_cmap('tab10', len([l for l in unique_labels if l != -1]))\n",
+    "\n",
+    "plt.figure(figsize=(8, 6))\n",
+    "color_idx = 0\n",
+    "for lbl in unique_labels:\n",
+    "    mask = (best_labels == lbl)\n",
+    "    if lbl == -1:\n",
+    "        plt.scatter(X[mask, 0], X[mask, 1], s=4, c='black',\n",
+    "                    marker='.', alpha=0.4, label='Noise (-1)')\n",
+    "    else:\n",
+    "        plt.scatter(X[mask, 0], X[mask, 1], s=10, alpha=0.7,\n",
+    "                    color=cmap(color_idx), label=f'Cluster {lbl}')\n",
+    "        color_idx += 1\n",
+    "\n",
+    "plt.title(f\"DBSCAN — Best: eps={best['eps']}, min_samples={best['min_samples']}\")\n",
+    "plt.xlabel('tsne_1')\n",
+    "plt.ylabel('tsne_2')\n",
+    "plt.legend(markerscale=2, fontsize=8, ncol=2)\n",
+    "plt.tight_layout()\n",
+    "plt.savefig('fig_dbscan_best.png', dpi=110)\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Visualize all DBSCAN combos in a grid (eps × min_samples)\n",
+    "fig, axes = plt.subplots(len(min_samples_values), len(eps_values),\n",
+    "                         figsize=(18, 14), sharex=True, sharey=True)\n",
+    "idx = 0\n",
+    "for i, ms in enumerate(min_samples_values):\n",
+    "    for j, eps in enumerate(eps_values):\n",
+    "        r = dbscan_results[idx]\n",
+    "        ax = axes[i][j]\n",
+    "        lbl = r['labels']\n",
+    "        unique = sorted(set(lbl))\n",
+    "        cmap2 = cm.get_cmap('tab10', max(len(unique), 2))\n",
+    "        ci = 0\n",
+    "        for u in unique:\n",
+    "            mask = (lbl == u)\n",
+    "            if u == -1:\n",
+    "                ax.scatter(X[mask, 0], X[mask, 1], s=2, c='black', marker='.', alpha=0.3)\n",
+    "            else:\n",
+    "                ax.scatter(X[mask, 0], X[mask, 1], s=3, alpha=0.5, color=cmap2(ci))\n",
+    "                ci += 1\n",
+    "        ax.set_title(f'eps={eps}\\nms={ms}\\nk={r[\"n_clusters\"]}', fontsize=6)\n",
+    "        ax.tick_params(labelsize=5)\n",
+    "        idx += 1\n",
+    "\n",
+    "fig.suptitle('DBSCAN Grid: eps × min_samples', fontsize=13)\n",
+    "plt.tight_layout()\n",
+    "plt.savefig('fig_dbscan_grid.png', dpi=100)\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### 3(i): Final comparison — all methods"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Build final comparison table\n",
+    "final_rows = [\n",
+    "    # Fill in K-means / K-Medoids from Lab 12\n",
+    "    {'Method': 'K-Means (Lab 12)',         'Purity': None, 'NMI': None, 'Silhouette': None},\n",
+    "    {'Method': 'K-Medoids (Lab 12)',        'Purity': None, 'NMI': None, 'Silhouette': None},\n",
+    "    {'Method': 'Hier. Ward',               'Purity': hier_results['ward']['Purity'],\n",
+    "                                            'NMI': hier_results['ward']['NMI'],\n",
+    "                                            'Silhouette': hier_results['ward']['Silhouette']},\n",
+    "    {'Method': 'Hier. Complete',           'Purity': hier_results['complete']['Purity'],\n",
+    "                                            'NMI': hier_results['complete']['NMI'],\n",
+    "                                            'Silhouette': hier_results['complete']['Silhouette']},\n",
+    "    {'Method': 'Hier. Average',            'Purity': hier_results['average']['Purity'],\n",
+    "                                            'NMI': hier_results['average']['NMI'],\n",
+    "                                            'Silhouette': hier_results['average']['Silhouette']},\n",
+    "    {'Method': 'Hier. Single',             'Purity': hier_results['single']['Purity'],\n",
+    "                                            'NMI': hier_results['single']['NMI'],\n",
+    "                                            'Silhouette': hier_results['single']['Silhouette']},\n",
+    "    {'Method': f\"DBSCAN (eps={best['eps']}, ms={best['min_samples']})\",\n",
+    "                                            'Purity': best['Purity'],\n",
+    "                                            'NMI': best['NMI'],\n",
+    "                                            'Silhouette': best['Silhouette']},\n",
+    "]\n",
+    "\n",
+    "final_df = pd.DataFrame(final_rows)\n",
+    "\n",
+    "def fmt(v):\n",
+    "    return f'{v:.4f}' if v is not None else 'N/A (fill from Lab 12)'\n",
+    "\n",
+    "print(f\"{'Method':<38} {'Purity':>8} {'NMI':>8} {'Silhouette':>10}\")\n",
+    "print('-' * 66)\n",
+    "for _, row in final_df.iterrows():\n",
+    "    print(f\"{row['Method']:<38} {fmt(row['Purity']):>8} {fmt(row['NMI']):>8} {fmt(row['Silhouette']):>10}\")\n",
+    "\n",
+    "print()\n",
+    "print('Analysis:')\n",
+    "print('  - Ward linkage typically performs best among hierarchical methods')\n",
+    "print('    because it minimises intra-cluster variance — suitable for')\n",
+    "print('    compact, roughly equal-sized clusters.')\n",
+    "print('  - Single linkage is prone to chaining effects and usually worst.')\n",
+    "print('  - DBSCAN does not need k specified and handles noise naturally,')\n",
+    "print('    but quality depends heavily on eps and min_samples tuning.')\n",
+    "print('  - Fill K-Means/K-Medoids values from Lab 12 for full comparison.')"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "name": "python",
+   "version": "3.10.0"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
